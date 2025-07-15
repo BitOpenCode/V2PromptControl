@@ -289,9 +289,9 @@
         setTimeout(async () => {
           try {
             await fetch(ENDPOINT_DELETE, {
-              method: 'POST',
+              method: 'DELETE',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ id: Number(id) }) 
+              body: JSON.stringify({ id: Number(id) })
             });
             showToast('Промпт удалён');
             loadPrompts();
@@ -333,3 +333,4 @@
   </script>
 </body>
 </html>
+
