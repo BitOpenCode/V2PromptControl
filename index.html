@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Prompt Manager</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { darkMode: 'class' };
+  </script>
+  <style>
+    /* «линейный спойлер»: показываем только ~2‑3 строки, остальное скрыто */
+    .collapsed {
+      max-height: 4.5rem; /* ≈3 строки для base text */
+      overflow: hidden;
+      position: relative;
+    }
+    .collapsed::after {
+      content: "";
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 1.5rem;
+      background: linear-gradient(to bottom, rgba(17,24,39,0) 0%, rgba(17,24,39,1) 100%);
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col bg-gray-900 text-gray-100 font-sans">
+  <!-- Header -->
+  <header class="w-full py-4 px-6 bg-gradient-to-r from-indigo-500/80 to-sky-500/80 shadow-md flex items-center gap-3">
+        <h1 class="text-xl font-semibold tracking-wide">Prompt Manager</h1>
+  </header>
+
+  <!-- Prompt list -->
+  <main id="promptList" class="flex-1 overflow-y-auto p-6 space-y-4"></main>
+
+  <!-- New prompt bar -->
+  <form id="newPromptForm" class="w-full bg-gray-800/80 backdrop-blur sticky bottom-0 p-4 flex gap-3">
+    <textarea id="promptInput" placeholder="Введите ваш промпт…" rows="2" class="flex-1 resize-none bg-gray-700 rounded-lg px-4 py-3 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500 min-h-[48px] max-h-60 overflow-y-auto" required></textarea>
+    <button id="saveBtn" type="submit" class="bg-sky-500 hover:bg-sky-400 active:bg-sky-600 transition rounded-lg px-6 py-3 font-medium text-gray-900 disabled:opacity-50 disabled:pointer-events-none">
+      Отправить
+    </button>
+  </form>
+
+  <!-- Toast container -->
+  <div id="toast" class="fixed bottom-24 left-1/2 -translate-x-1/2 bg-gray-800 text-gray-100 px-4 py-2 rounded-lg shadow-lg opacity-0 pointer-events-none transition"></div>
+
+  <script>
+    const listEl   = document.getElementById('promptList');
+    const formEl   = document.getElementById('newPromptForm');
+    const inputEl  = document.getElementById('promptInput');
+    const toastEl  = document.getElementById('toast');
+    const saveBtn  = document.getElementById('saveBtn');
+
+    const ENDPOINT_READ  = 'https://n8n.blc.am/webhook/promptake';
+    const ENDPOINT_WRITE = 'https://n8n.blc.am/webhook/promptwrite';
+
+    // Auto‑resize textarea
+    inputEl.addEventListener('input', function () {
+      this.style.height = 'auto';
+      this.style.height = this.scrollHeight + 'px';
+    });
+
+    function showToast(msg, ok = true) {
+      toastEl.textContent = msg;
+      toastEl.style.backgroundColor = ok ? '#059669' : '#DC2626';
+      toastEl.style.opacity = '1';
+      setTimeout(() => (toastEl.style.opacity = '0'), 2500);
+    }
+
+    // «07 Jul 2025, 19:51»
+    function prettyDate(iso) {
+      if (!iso) return '';
+      const d = new Date(iso);
+      if (isNaN(d)) return iso;
+      return d.toLocaleString(undefined, {
+        year: 'numeric', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit'
+      });
+    }
+
+    function cardTemplate({ prompt, date }) {
+      return `
+        <div class="bg-gray-800 rounded-xl p-4 shadow-md flex flex-col gap-2">
+          <div class="flex justify-between items-center text-sm text-gray-400">
+            <span>${date ? '🗓 ' + prettyDate(date) : ''}</span>
+            <button class="copyBtn text-sky-400 hover:text-sky-300" data-prompt="${encodeURIComponent(prompt)}">Копировать</button>
+          </div>
+          <pre class="promptText collapsed whitespace-pre-wrap break-words text-gray-100">${prompt}</pre>
+          <button class="toggleBtn self-end text-xs text-sky-400 hover:text-sky-300">Показать больше</button>
+        </div>`;
+    }
+
+    async function loadPrompts() {
+      listEl.innerHTML = '<p class="text-center text-gray-400">Loading…</p>';
+      try {
+        const res  = await fetch(ENDPOINT_READ, { mode: 'cors' });
+        if (!res.ok) throw new Error(res.status + ' ' + res.statusText);
+        let data = await res.json();
+        if (!Array.isArray(data) && Array.isArray(data.data)) data = data.data;
+        listEl.innerHTML = '';
+        if (!data || data.length === 0) {
+          listEl.innerHTML = '<p class="text-center text-gray-500">Пока нет сохранённых промптов. Добавьте первый ниже! ✨</p>';
+          return;
+        }
+        data.forEach((rec) => {
+          const promptText = rec.prompt || rec.PROMPT || rec.text || rec.body || '';
+          const dateText   = rec.date   || rec.Date   || rec.created_at || rec.ts || '';
+          listEl.insertAdjacentHTML('beforeend', cardTemplate({ prompt: promptText, date: dateText }));
+        });
+      } catch (err) {
+        console.error(err);
+        listEl.innerHTML = '<p class="text-center text-rose-500">Ошибка загрузки промптов.</p>';
+      }
+    }
+
+    // Delegated events for Copy + Toggle
+    listEl.addEventListener('click', (e) => {
+      // Copy logic
+      if (e.target.classList.contains('copyBtn')) {
+        const txt = decodeURIComponent(e.target.dataset.prompt);
+        navigator.clipboard.writeText(txt).then(() => showToast('Скопировано!'));
+        return;
+      }
+      // Toggle collapse/expand
+      if (e.target.classList.contains('toggleBtn')) {
+        const pre   = e.target.previousElementSibling; // <pre>
+        const btn   = e.target;
+        pre.classList.toggle('collapsed');
+        btn.textContent = pre.classList.contains('collapsed') ? 'Показать больше' : 'Показать меньше';
+      }
+    });
+
+    formEl.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const prompt = inputEl.value.trim();
+      if (!prompt) return;
+      saveBtn.disabled = true;
+      try {
+        await fetch(ENDPOINT_WRITE, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt })
+        });
+        showToast('Сохранено');
+        inputEl.value = '';
+        inputEl.style.height = 'auto';
+        loadPrompts();
+      } catch (err) {
+        console.error(err);
+        showToast('Error while saving', false);
+      } finally {
+        saveBtn.disabled = false;
+      }
+    });
+
+    // Kick off
+    loadPrompts();
+  </script>
+</body>
+</html>
