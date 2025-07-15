@@ -83,6 +83,9 @@
       border: 1.5px solid #3b82f6;
       outline: none;
     }
+    .no-gradient {
+      background: none !important;
+    }
     @media (max-width: 640px) {
       .apple-card { border-radius: 16px; }
       .apple-btn { border-radius: 12px; font-size: 1rem; }
@@ -227,7 +230,7 @@
           <textarea id="editPromptInput" class="apple-input w-full" rows="4"></textarea>
           <div class="flex gap-3 justify-end">
             <button id="cancelEditBtn" class="apple-btn px-4 py-2 bg-gray-700 text-gray-300 hover:bg-gray-600">Отмена</button>
-            <button id="saveEditBtn" class="apple-btn px-4 py-2 bg-sky-500 text-gray-900 font-semibold hover:bg-sky-400">Сохранить</button>
+            <button id="saveEditBtn" class="apple-btn px-4 py-2 !bg-emerald-600 text-white font-semibold hover:!bg-emerald-500 no-gradient">Сохранить</button>
           </div>
         </div>
       </div>
