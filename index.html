@@ -1,17 +1,20 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="ru" class="dark">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0" />
   <title>Prompt Manager</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = { darkMode: 'class' };
   </script>
   <style>
-    /* «линейный спойлер»: показываем только ~2‑3 строки, остальное скрыто */
+    html, body {
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
     .collapsed {
-      max-height: 4.5rem; /* ≈3 строки для base text */
+      max-height: 4.5rem;
       overflow: hidden;
       position: relative;
     }
@@ -24,27 +27,99 @@
       height: 1.5rem;
       background: linear-gradient(to bottom, rgba(17,24,39,0) 0%, rgba(17,24,39,1) 100%);
     }
+    .fade-in {
+      animation: fadeIn 0.7s cubic-bezier(0.4,0,0.2,1);
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px) scale(0.98); }
+      to   { opacity: 1; transform: none; }
+    }
+    #toast.show {
+      opacity: 1 !important;
+      transform: translateY(0) scale(1.05);
+    }
+    /* Apple-style glassmorphism */
+    .glass {
+      background: rgba(30, 32, 36, 0.85);
+      box-shadow: 0 4px 32px 0 rgba(0,0,0,0.18);
+      backdrop-filter: blur(16px) saturate(180%);
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+    .apple-btn {
+      background: linear-gradient(90deg, #23272f 0%, #23272f 100%);
+      color: #fff;
+      border-radius: 16px;
+      font-weight: 600;
+      box-shadow: 0 2px 8px 0 rgba(0,0,0,0.10);
+      transition: background 0.2s, box-shadow 0.2s, color 0.2s;
+      touch-action: manipulation;
+    }
+    .apple-btn:active {
+      background: #181a1e;
+      color: #b3b3b3;
+      box-shadow: 0 1px 4px 0 rgba(0,0,0,0.18);
+    }
+    .apple-card {
+      border-radius: 24px;
+      box-shadow: 0 4px 32px 0 rgba(0,0,0,0.18);
+      border: 1.5px solid rgba(255,255,255,0.06);
+      background: linear-gradient(120deg, rgba(36,37,38,0.98) 60%, rgba(24,26,30,0.98) 100%);
+      transition: box-shadow 0.2s, border 0.2s;
+    }
+    .apple-card:active {
+      box-shadow: 0 2px 8px 0 rgba(0,0,0,0.18);
+      border: 1.5px solid #3b82f6;
+    }
+    .apple-input {
+      background: rgba(36,37,38,0.95);
+      border-radius: 14px;
+      border: 1.5px solid rgba(255,255,255,0.08);
+      color: #fff;
+      font-size: 1rem;
+      padding: 0.85rem 1.1rem;
+      transition: border 0.2s;
+    }
+    .apple-input:focus {
+      border: 1.5px solid #3b82f6;
+      outline: none;
+    }
+    @media (max-width: 640px) {
+      .apple-card { border-radius: 16px; }
+      .apple-btn { border-radius: 12px; font-size: 1rem; }
+      .apple-input { border-radius: 10px; font-size: 1rem; }
+    }
   </style>
 </head>
-<body class="min-h-screen flex flex-col bg-gray-900 text-gray-100 font-sans">
+<body class="min-h-screen flex flex-col bg-gradient-to-br from-[#181a1e] via-[#23272f] to-[#23272f] text-gray-100 font-sans">
   <!-- Header -->
-  <header class="w-full py-4 px-6 bg-gradient-to-r from-indigo-500/80 to-sky-500/80 shadow-md flex items-center gap-3">
-        <h1 class="text-xl font-semibold tracking-wide">Prompt Manager</h1>
+  <header class="w-full py-4 px-6 glass shadow-lg flex items-center gap-4 rounded-b-2xl mb-2 sticky top-0 z-30">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8 text-sky-200 drop-shadow">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6l4 2" />
+      <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.5" fill="none"/>
+    </svg>
+    <h1 class="text-2xl font-bold tracking-wide text-white drop-shadow">Prompt Manager</h1>
   </header>
 
+  <!-- Статистика и поиск -->
+  <section class="max-w-2xl mx-auto w-full px-4 sm:px-0 mt-2 mb-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+    <div id="stats" class="text-sm text-gray-400 select-none"></div>
+    <input id="searchInput" type="text" placeholder="Поиск по промптам…" class="apple-input w-full sm:w-64" />
+  </section>
+
   <!-- Prompt list -->
-  <main id="promptList" class="flex-1 overflow-y-auto p-6 space-y-4"></main>
+  <main id="promptList" class="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5 max-w-2xl mx-auto w-full"></main>
 
   <!-- New prompt bar -->
-  <form id="newPromptForm" class="w-full bg-gray-800/80 backdrop-blur sticky bottom-0 p-4 flex gap-3">
-    <textarea id="promptInput" placeholder="Введите ваш промпт…" rows="2" class="flex-1 resize-none bg-gray-700 rounded-lg px-4 py-3 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500 min-h-[48px] max-h-60 overflow-y-auto" required></textarea>
-    <button id="saveBtn" type="submit" class="bg-sky-500 hover:bg-sky-400 active:bg-sky-600 transition rounded-lg px-6 py-3 font-medium text-gray-900 disabled:opacity-50 disabled:pointer-events-none">
-      Отправить
+  <form id="newPromptForm" class="w-full glass sticky bottom-0 p-4 flex gap-3 rounded-t-2xl shadow-2xl max-w-2xl mx-auto">
+    <textarea id="promptInput" placeholder="Введите ваш промпт…" rows="2" class="apple-input flex-1 resize-none min-h-[48px] max-h-60 overflow-y-auto" required></textarea>
+    <button id="saveBtn" type="submit" class="apple-btn px-7 py-3 disabled:opacity-50 disabled:pointer-events-none">
+      <span class="hidden sm:inline">Отправить</span>
+      <svg class="sm:hidden w-6 h-6 mx-auto" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
     </button>
   </form>
 
   <!-- Toast container -->
-  <div id="toast" class="fixed bottom-24 left-1/2 -translate-x-1/2 bg-gray-800 text-gray-100 px-4 py-2 rounded-lg shadow-lg opacity-0 pointer-events-none transition"></div>
+  <div id="toast" class="fixed bottom-24 left-1/2 -translate-x-1/2 glass text-gray-100 px-5 py-3 rounded-xl shadow-2xl opacity-0 pointer-events-none transition-all duration-300 z-50 text-base font-medium"></div>
 
   <script>
     const listEl   = document.getElementById('promptList');
@@ -52,9 +127,16 @@
     const inputEl  = document.getElementById('promptInput');
     const toastEl  = document.getElementById('toast');
     const saveBtn  = document.getElementById('saveBtn');
+    const searchEl = document.getElementById('searchInput');
+    const statsEl  = document.getElementById('stats');
+
+    let allPrompts = [];
+    let lastDate = '';
 
     const ENDPOINT_READ  = 'https://n8n.blc.am/webhook/promptake';
     const ENDPOINT_WRITE = 'https://n8n.blc.am/webhook/promptwrite';
+    const ENDPOINT_DELETE = 'https://n8n.blc.am/webhook/promptdelete';
+    const ENDPOINT_EDIT   = 'https://n8n.blc.am/webhook/promptedit';
 
     // Auto‑resize textarea
     inputEl.addEventListener('input', function () {
@@ -65,11 +147,13 @@
     function showToast(msg, ok = true) {
       toastEl.textContent = msg;
       toastEl.style.backgroundColor = ok ? '#059669' : '#DC2626';
-      toastEl.style.opacity = '1';
-      setTimeout(() => (toastEl.style.opacity = '0'), 2500);
+      toastEl.classList.add('show');
+      setTimeout(() => {
+        toastEl.classList.remove('show');
+      }, 2500);
     }
 
-    // «07 Jul 2025, 19:51»
+
     function prettyDate(iso) {
       if (!iso) return '';
       const d = new Date(iso);
@@ -79,15 +163,19 @@
       });
     }
 
-    function cardTemplate({ prompt, date }) {
+    function cardTemplate({ id, prompt, date }, idx) {
       return `
-        <div class="bg-gray-800 rounded-xl p-4 shadow-md flex flex-col gap-2">
-          <div class="flex justify-between items-center text-sm text-gray-400">
+        <div class="apple-card p-5 shadow-xl flex flex-col gap-3 fade-in group relative active:border-sky-500" data-idx="${idx}" data-id="${id}">
+          <div class="flex justify-between items-center text-xs text-gray-400 select-none">
             <span>${date ? '🗓 ' + prettyDate(date) : ''}</span>
-            <button class="copyBtn text-sky-400 hover:text-sky-300" data-prompt="${encodeURIComponent(prompt)}">Копировать</button>
+            <div class="flex gap-2">
+              <button class="apple-btn copyBtn px-3 py-1 text-sky-300 hover:text-sky-200" data-prompt="${encodeURIComponent(prompt)}">Копировать</button>
+              <button class="apple-btn editBtn px-3 py-1 text-amber-300 hover:text-amber-200" title="Редактировать">✏️</button>
+              <button class="apple-btn deleteBtn px-3 py-1 text-rose-300 hover:text-rose-200" title="Удалить">🗑️</button>
+            </div>
           </div>
-          <pre class="promptText collapsed whitespace-pre-wrap break-words text-gray-100">${prompt}</pre>
-          <button class="toggleBtn self-end text-xs text-sky-400 hover:text-sky-300">Показать больше</button>
+          <pre class="promptText collapsed whitespace-pre-wrap break-words text-gray-100 text-base leading-relaxed font-mono transition-all duration-300 bg-transparent rounded-lg px-3 py-2 cursor-pointer select-text">${prompt}</pre>
+          <button class="apple-btn toggleBtn self-end text-xs text-sky-300 hover:text-sky-200 px-3 py-1">Показать больше</button>
         </div>`;
     }
 
@@ -98,24 +186,83 @@
         if (!res.ok) throw new Error(res.status + ' ' + res.statusText);
         let data = await res.json();
         if (!Array.isArray(data) && Array.isArray(data.data)) data = data.data;
-        listEl.innerHTML = '';
-        if (!data || data.length === 0) {
-          listEl.innerHTML = '<p class="text-center text-gray-500">Пока нет сохранённых промптов. Добавьте первый ниже! ✨</p>';
-          return;
-        }
-        data.forEach((rec) => {
-          const promptText = rec.prompt || rec.PROMPT || rec.text || rec.body || '';
-          const dateText   = rec.date   || rec.Date   || rec.created_at || rec.ts || '';
-          listEl.insertAdjacentHTML('beforeend', cardTemplate({ prompt: promptText, date: dateText }));
-        });
+        allPrompts = (data || []).map((rec) => ({
+          id: rec.id,
+          prompt: rec.prompt || rec.PROMPT || rec.text || rec.body || '',
+          date: rec.date || rec.Date || rec.created_at || rec.ts || ''
+        }));
+        lastDate = allPrompts.length ? allPrompts.reduce((a, b) => (a.date > b.date ? a : b)).date : '';
+        renderPrompts();
+        updateStats();
       } catch (err) {
         console.error(err);
         listEl.innerHTML = '<p class="text-center text-rose-500">Ошибка загрузки промптов.</p>';
+        allPrompts = [];
+        updateStats();
       }
     }
 
-    // Delegated events for Copy + Toggle
+    function renderPrompts() {
+      const q = (searchEl.value || '').toLowerCase();
+      const filtered = !q ? allPrompts : allPrompts.filter(p => p.prompt.toLowerCase().includes(q));
+      listEl.innerHTML = '';
+      if (!filtered.length) {
+        listEl.innerHTML = '<p class="text-center text-gray-500">Промпты не найдены.</p>';
+        return;
+      }
+      filtered.forEach((rec, idx) => {
+        listEl.insertAdjacentHTML('beforeend', cardTemplate(rec, idx));
+      });
+    }
+
+    function updateStats() {
+      statsEl.textContent = `Всего промптов: ${allPrompts.length}${lastDate ? ` • Последний: ${prettyDate(lastDate)}` : ''}`;
+    }
+
+    // Модальное окно для редактирования
+    const modalHtml = `
+      <div id="editModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm transition">
+        <div class="glass rounded-2xl p-6 shadow-2xl w-full max-w-md flex flex-col gap-4 animate-fadeIn">
+          <h2 class="text-lg font-semibold text-gray-100 mb-2">Редактировать промпт</h2>
+          <textarea id="editPromptInput" class="apple-input w-full" rows="4"></textarea>
+          <div class="flex gap-3 justify-end">
+            <button id="cancelEditBtn" class="apple-btn px-4 py-2 bg-gray-700 text-gray-300 hover:bg-gray-600">Отмена</button>
+            <button id="saveEditBtn" class="apple-btn px-4 py-2 bg-sky-500 text-gray-900 font-semibold hover:bg-sky-400">Сохранить</button>
+          </div>
+        </div>
+      </div>
+    `;
+    function showEditModal(idx) {
+      document.body.insertAdjacentHTML('beforeend', modalHtml);
+      const modal = document.getElementById('editModal');
+      const input = document.getElementById('editPromptInput');
+      input.value = allPrompts[idx].prompt;
+      input.focus();
+      document.getElementById('cancelEditBtn').onclick = () => modal.remove();
+      document.getElementById('saveEditBtn').onclick = async () => {
+        const val = input.value.trim();
+        if (val) {
+          const id = allPrompts[idx].id;
+          try {
+            await fetch(ENDPOINT_EDIT, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ id, prompt: val })
+            });
+            showToast('Промпт обновлён');
+            modal.remove();
+            loadPrompts();
+          } catch (err) {
+            showToast('Ошибка при обновлении', false);
+          }
+        }
+      };
+    }
+
+    // Delegated events for Copy + Toggle + Edit + Delete
     listEl.addEventListener('click', (e) => {
+      const card = e.target.closest('[data-idx]');
+      const idx = card ? +card.dataset.idx : -1;
       // Copy logic
       if (e.target.classList.contains('copyBtn')) {
         const txt = decodeURIComponent(e.target.dataset.prompt);
@@ -128,6 +275,31 @@
         const btn   = e.target;
         pre.classList.toggle('collapsed');
         btn.textContent = pre.classList.contains('collapsed') ? 'Показать больше' : 'Показать меньше';
+        return;
+      }
+      // Edit logic
+      if (e.target.classList.contains('editBtn')) {
+        showEditModal(idx);
+        return;
+      }
+      // Delete logic
+      if (e.target.classList.contains('deleteBtn')) {
+        const id = allPrompts[idx].id;
+        card.classList.add('opacity-0', 'scale-95', 'duration-300');
+        setTimeout(async () => {
+          try {
+            await fetch(ENDPOINT_DELETE, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ id })
+            });
+            showToast('Промпт удалён');
+            loadPrompts();
+          } catch (err) {
+            showToast('Ошибка при удалении', false);
+          }
+        }, 250);
+        return;
       }
     });
 
@@ -153,6 +325,8 @@
         saveBtn.disabled = false;
       }
     });
+
+    searchEl.addEventListener('input', renderPrompts);
 
     // Kick off
     loadPrompts();
