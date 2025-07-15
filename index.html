@@ -291,7 +291,7 @@
             await fetch(ENDPOINT_DELETE, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ id })
+              body: JSON.stringify({ id: Number(id) }) 
             });
             showToast('Промпт удалён');
             loadPrompts();
